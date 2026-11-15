@@ -35,6 +35,7 @@ From past shorts. Each item is also built into the template or a step below:
 
   So whispering → narration → dramatic → shouting is the only way up, and the same steps in reverse are the only way down. Shouting must come after a dramatic line and be followed by one. `node scripts/check-delivery.mjs` enforces this and exits 1 on a jump. `build-timeline` warns too. To use a new tag, add it to `scripts/delivery.mjs` with a rung first. Every take is also levelled with `normalize-vo.mjs`.
 - **Capture chapters in parallel tabs, and never accept a partial chapter.**
+- **Music loud enough to feel.** When a licensed song is added in the YouTube app, set it to about **70%** under the narration at 100%. 21% and 40% were too quiet. The volume can't be changed after posting, so get it right before Upload.
 - **Keep the hook title clear of the panel.**
 - **No end card. Make it loop.** Nothing after the last line: no credit card, no thank-you, no "follow for more". Write the last beat so it leads back into the hook (the Naruto short ends on "…came home a hero", then cuts back to the village throwing him in the air). Render the last and first frames side by side and check the seam. `outroSeconds` exists only for a user who asks for an end card.
 - **The first two seconds decide the short.** YouTube's analytics on the Gojo short (2026-11-15, day one: 954 views, 49.55% stayed, 66% average view duration, 0 comments): half the feed swiped away before watching, while those who stayed watched two thirds. So the middle works and the open does not. The first beat therefore: shows the `hook` title and the most striking panel on frame 0 (no fade-in, no white flash), opens straight on the confrontation rather than the setup, says its point in 9 words or fewer, and moves at once (2–3 panels so the first cut lands inside the first second, or `punch`). The opening take's leading silence is trimmed by `build-timeline`. Open at narration or heightened, not a whisper (this last one is Claude's reading of the feedback, so it is a warning, not a rule).
@@ -198,7 +199,30 @@ Change the style in `src/components/`. Keep the credit line.
 
 Only when the user asks, and only to the platform and visibility they name. Default to **Private**.
 
-**Music decides the route.** Licensed songs (anime OSTs like "Sadness and Sorrow", trending sounds) can only be added while creating the Short in the **YouTube phone app**. They can't be added to an uploaded Short, and Studio's web editor only offers YouTube's royalty-free Audio Library. So if the user wants a licensed song, they AirDrop `out/short.mp4` to their phone and post from the app (Create a Short → Add sound); offer to delete any web draft afterwards, with confirmation, because deleting is permanent. Upload through Studio (below) only when it's no music or an Audio Library track (Editor → Audio).
+**Music decides the route.** Licensed songs (anime OSTs like "Sadness and Sorrow", trending sounds) can only be added while creating the Short in the **YouTube phone app**. They can't be added to an uploaded Short, and Studio's web editor only offers YouTube's royalty-free Audio Library. So if the user wants a licensed song, post from the phone app: on macOS through **iPhone Mirroring** (Route A below), otherwise the user does it on the phone themselves. Upload through Studio (Route B) only when it's no music or an Audio Library track (Editor → Audio).
+
+### Route A: the YouTube app through iPhone Mirroring (macOS, licensed music)
+
+Use this on a Mac (`uname` is `Darwin`) with the iPhone Mirroring app installed, whenever the Short gets a licensed song. On any other OS, give the user the same steps to do on their phone.
+
+Setup, once per Mac:
+- **macOS permissions:** Claude needs **Accessibility** and **Screen & System Audio Recording** under System Settings → Privacy & Security. On recent macOS these sit far down the Privacy list, and the sidebar's own "Accessibility" item is a different page (VoiceOver, Zoom). If the computer-use tools say these permissions are missing, walk the user to the Privacy & Security ones.
+- **Phone:** iPhone Mirroring must already be set up, with the phone locked and nearby. "iPhone in Use" or "Mac Locked" in the window means press **Connect** and wait for the home screen.
+
+Steps:
+1. **Video on the phone.** The user AirDrops `out/short.mp4` to the phone, or drags it into the iPhone Mirroring window (macOS 15.1+). Reveal it with `open -R out/short.mp4`.
+2. `request_access` for **iPhone Mirroring** only. Work with the background `app_*` tools (`app_screenshot`, `app_click`, `app_drag`): taps and slider drags work in the background. Coordinates are in the small mirrored window (about 217×480). Take a fresh `app_screenshot` after every tap, because sheets animate and a tap on a still-moving menu lands on the wrong item. One mis-tap opened "Send feedback to Google"; if that appears, close it and choose **Discard**, never Get started.
+3. YouTube → **+** → make sure the **Short** tab is selected, not Live → **Add from gallery** (if iOS asks for photo access, that is the user's choice: let them answer) → pick the 0:59 video → **Next** → **Done** (keep the full length).
+4. **Add sound**: the song is usually under "For you" once used before; otherwise search. Typing never reaches the mirrored phone from the background, so ask for full-screen control (`request_full_control`, reason `keyboard_blocked`) only for typing, and release it right after. The original OST recording is often not in YouTube's library, only covers: pick the most-used official cover and tell the user which.
+5. **Volume** (speaker icon, top right): narration ("Your audio") at 100%, the song at **70%**. Drag the slider and zoom to read the percentage. This can't be changed after posting.
+6. **Next** → **Caption your Short**: the title with hashtags. Type it in chunks with a short wait between them, and type the main subject's name (e.g. "Pain") on its own: iOS autocorrect and dropped keystrokes turned "Pain" into "lann" once. Zoom to check it. Arrow keys don't move the cursor reliably in mirroring; to fix a word, select all, delete and retype.
+7. **Select audience** → "No, it's not Made for Kids". Visibility as the user chose. Going back from the details screen to the editor asks "Discard changes?": discarding keeps the video and sound but clears the caption and audience.
+8. **Stop before Upload Short** and show the user everything. Upload only on their yes.
+9. Pull down on the channel's Shorts tab to refresh (the list caches), watch the "Uploading N%" tile until it turns into a normal one, then confirm visibility. Keep the YouTube app open until then.
+10. **Replacing a posted Short** (e.g. to change the music volume): post the new one first, then delete the old one only after the user confirms. Open the old Short itself and read its title and view count before ⋮ → Delete, because the tile menu doesn't say which video it belongs to.
+11. `app_release` when done.
+
+### Route B: YouTube Studio on the web (no music, or an Audio Library track)
 
 1. Open `https://studio.youtube.com` in the built-in browser pane; the user signs in there themselves. Claude in Chrome also works, but its file upload is capped at 10 MB and a 60s render is about 35 MB, so either way **the user drags `out/short.mp4` in** (reveal it with `open -R out/short.mp4`). Open the upload box for them: `https://studio.youtube.com/channel/<id>/videos/upload?d=ud`.
 2. Once the file is in, fill in the title and the description (with the credit line), choose "No, it's not made for kids", click through Video elements and Checks (report the copyright check result), and choose the visibility the user picked.
