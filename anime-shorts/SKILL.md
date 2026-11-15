@@ -37,6 +37,8 @@ From past shorts. Each item is also built into the template or a step below:
 - **Capture chapters in parallel tabs, and never accept a partial chapter.**
 - **Keep the hook title clear of the panel.**
 - **No end card. Make it loop.** Nothing after the last line: no credit card, no thank-you, no "follow for more". Write the last beat so it leads back into the hook (the Naruto short ends on "…came home a hero", then cuts back to the village throwing him in the air). Render the last and first frames side by side and check the seam. `outroSeconds` exists only for a user who asks for an end card.
+- **The first two seconds decide the short.** YouTube's analytics on the Gojo short (2026-11-15, day one: 954 views, 49.55% stayed, 66% average view duration, 0 comments): half the feed swiped away before watching, while those who stayed watched two thirds. So the middle works and the open does not. The first beat therefore: shows the `hook` title and the most striking panel on frame 0 (no fade-in, no white flash), opens straight on the confrontation rather than the setup, says its point in 9 words or fewer, and moves at once (2–3 panels so the first cut lands inside the first second, or `punch`). The opening take's leading silence is trimmed by `build-timeline`. Open at narration or heightened, not a whisper (this last one is Claude's reading of the feedback, so it is a warning, not a rule).
+- **End on a question people want to answer.** The same short got no comments. The last line asks the viewer something debatable about the moment ("Did Sukuna beat Gojo, or did Mahoraga?"), not a generic "what do you think?". It is still a line of the story, not an end card, and it must still lead back into the hook for the loop. Give the user the same question as a suggested pinned comment. `check-delivery.mjs` enforces both this and the opening rules.
 - **Visuals get checked before the user sees them.** Render stills at the hook, every punch beat and every colour word, and Read them before rendering the full video.
 
 ## Workspace
@@ -79,7 +81,7 @@ Chapter URLs are asked for in phase 2, after research has named the chapters.
 1. WebSearch the topic, plus the series' fandom wiki chapter list. Find the series, author and official English publisher/platform (`readOn`), and the exact chapter numbers and pages where each moment happens.
 2. Check every chapter's **official** release date is on or before today. Drop anything that is only leaked.
 3. Write `brief.md`: the series, author, `readOn`, chapters (number, title, release date, why it is needed), and a beat list of 8–14 beats. Each beat gives its chapter and page (approximate is fine), what happens, and the commentary point.
-4. Hook first: the first beat is the most striking panel or question, not the setup.
+4. Hook first: the first beat is the most striking panel of the confrontation itself plus the question the short answers, not the setup. Give it 2–3 panels. Last beat: a debatable question for the comments that also leads back into the hook.
 
 **Checkpoint 1:** show the brief and wait for approval.
 
@@ -124,17 +126,19 @@ node scripts/cut-panels.mjs            # all chapters; or --chapters c1050,c1051
   "author": "Gege Akutami",
   "readOn": "MANGA Plus",
   "beats": [
-    { "id": "b1", "panels": ["c236-p004-2"], "hook": "He lost. Here's why.", "line": "[whispering] Nobody believed this panel was real.", "effect": "push", "emphasis": ["nobody"] },
+    { "id": "b1", "panels": ["c236-p004-2", "c236-p005-1"], "hook": "He lost. Here's why.", "line": "[dramatically] The strongest sorcerer alive. Cut in half.", "effect": "punch", "emphasis": ["half"] },
     { "id": "b2", "panels": ["c235-p010-1", "c235-p010-2"], "line": "...", "effect": "kenburns" },
-    { "id": "b3", "panels": ["c236-p006-1"], "line": "[shouting] And then — this.", "effect": "punch+speedlines", "emphasis": ["this"] }
+    { "id": "b3", "panels": ["c236-p006-1"], "line": "[shouting] And then — this.", "effect": "punch+speedlines", "emphasis": ["this"] },
+    { "id": "b12", "panels": ["c236-p012-1"], "line": "So who really beat him: Sukuna, or Mahoraga?", "effect": "push" }
   ]
 }
 ```
 
 - `panels`: ids from `panels.json`. Several panels in one beat split its time evenly; use that for a quick sequence.
 - `line`: the voiceover. Inline ElevenLabs v4 tags (`[whispering]`, `[dramatically]`, `[shouting]`, `[pause]`) shape delivery and are stripped from captions. Keep each line at 15 words or fewer, about 2–5 seconds spoken.
-- Delivery follows the ladder (see "The user's feedback"): each beat at most one rung from the last. Plan the arc on purpose: a quiet hook, narration, building to dramatic, a single shouted peak, then stepping back down. Don't swing between extremes for effect. **Run `node scripts/check-delivery.mjs` and get it passing before you price or generate anything.** Show its rung bars in the beat table at checkpoint 3.
-- `hook`: big title text over the beat. First beat only, 6 words or fewer.
+- Delivery follows the ladder (see "The user's feedback"): each beat at most one rung from the last. Plan the arc on purpose: a hook at narration or heightened, building to dramatic, a single shouted peak, then stepping back down to the closing question. Don't swing between extremes for effect. **Run `node scripts/check-delivery.mjs` and get it passing before you price or generate anything.** It also checks the first beat (hook title, 9 words or fewer, 2+ panels or `punch`) and that the last line is a question. Show its rung bars in the beat table at checkpoint 3.
+- `hook`: big title text over the beat. First beat only, required, 6 words or fewer. It is on screen from frame 0.
+- The first beat's `line` is 9 words or fewer and names the stakes at once. The last beat's `line` is a question the viewer can answer in a comment; `"closingQuestion": false` at the top level turns that check off for a short that should not have one.
 - `effect`: motion `kenburns` (default) | `push` (slow tense zoom) | `punch` (slam-in, shake, white flash: impact panels) | `shake` (rumble) | `pan` (scroll down a tall panel; automatic for very tall ones), plus overlays `speedlines` and `flash`, joined with `+`.
 - `emphasis`: words shown big and red in the captions. One per beat at most.
 - Colour words are automatic: a spoken colour ("purple", "red", "black", "gold"…) is drawn in that colour, dark ones with a white outline. Add series-specific ones with `wordColors` (top level or per beat), a colour per word or a list per phrase, e.g. `"wordColors": { "black flash": ["#0a0a0a", "#e10600"], "cursed energy": "#5b2bff" }`.
@@ -171,10 +175,11 @@ pnpm exec remotion still src/index.ts Short review/hook.png --frame=20
 pnpm exec remotion render src/index.ts Short out/short.mp4 --codec h264 --crf 18 --log=warn
 ```
 
-1. Render stills at the hook, at every `punch` beat and at every coloured word (each beat's frame is `beats[i].from` in `src/timeline.json`, plus about 4), and Read them. Check that captions don't cover a face or speech bubble, the hook is readable, and the panel is sharp.
+1. Render stills at **frame 0** (it must already show the hook title and the panel: this is what the feed shows first), at the hook after it settles, at every `punch` beat and at every coloured word (each beat's frame is `beats[i].from` in `src/timeline.json`, plus about 4), and Read them. Check that captions don't cover a face or speech bubble, the hook is readable, and the panel is sharp.
 2. Render and check with `ffprobe` (1080×1920, an audio stream, the expected duration). Pull 4–6 frames with `ffmpeg -vf "select=eq(n\,<frame>)"` and look at them.
 3. Send `out/short.mp4` to the user with `SendUserFile`, and include:
    - a suggested title and description, with the credit line (series, author, where to read it officially) in the description;
+   - a suggested pinned comment: the closing question, for the user to post and pin right after upload;
    - a reminder that licensed music (an OST, a trending sound) is added only in the phone app while creating the Short, never after upload;
    - any pages captured by screenshot, and any beat whose words were spread evenly instead of timed.
 
@@ -184,7 +189,7 @@ Tweaks are cheap: edit `script.json`, then rerun `build-timeline` and render. `p
 
 - A blurred, darkened copy of the panel fills the frame behind the sharp panel, which has a white border and a drop shadow, plus a vignette.
 - Every cut settles from a slight overshoot. `punch` slams in from 1.45×, shakes and flashes white.
-- Captions are Montserrat Black, uppercase, with a thick black stroke, 3 words at a time. The word being spoken turns yellow and `emphasis` words turn red. The hook is in Bangers.
+- Captions are Montserrat Black, uppercase, with a thick black stroke, 3 words at a time. The word being spoken turns yellow and `emphasis` words turn red. The hook is in Bangers, fully visible on frame 0.
 - A small credit line runs along the top edge for the whole Short. The bottom fifth is avoided because the platform's title and channel bar covers it. There is no end card.
 
 Change the style in `src/components/`. Keep the credit line.

@@ -1,10 +1,13 @@
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { impactFont } from './fonts';
 
+// The hook is fully visible on frame 0 and settles from a slight overshoot. It never fades
+// in: a feed viewer decides in the first second or two, and frame 0 is what they see first.
+
 export const Hook: React.FC<{ text: string }> = ({ text }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const s = spring({ frame, fps, config: { damping: 14 } });
+  const s = spring({ frame, fps, config: { damping: 14, stiffness: 200 }, durationInFrames: 10 });
   return (
     <AbsoluteFill style={{ alignItems: 'center', paddingTop: 95 }}>
       <div
@@ -19,8 +22,7 @@ export const Hook: React.FC<{ text: string }> = ({ text }) => {
           paintOrder: 'stroke fill',
           textTransform: 'uppercase',
           letterSpacing: 2,
-          transform: `translateY(${interpolate(s, [0, 1], [-60, 0])}px) rotate(-2deg) scale(${interpolate(s, [0, 1], [0.8, 1])})`,
-          opacity: s,
+          transform: `rotate(-2deg) scale(${interpolate(s, [0, 1], [1.12, 1])})`,
         }}
       >
         {text}

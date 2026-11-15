@@ -9,17 +9,31 @@
 // Without word timings the words of `line` are spread evenly over the beat.
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { checkTransitions } from './delivery.mjs';
+import { checkOpenAndClose } from './hook.mjs';
 
 const FPS = 30;
 const script = JSON.parse(await readFile('script.json', 'utf8'));
 for (const p of checkTransitions(script.beats)) console.warn(`delivery: ${p}`);
+{
+  const { errors, warnings } = checkOpenAndClose(script);
+  for (const p of [...errors, ...warnings]) console.warn(`hook: ${p}`);
+}
 const panelsByChapter = JSON.parse(await readFile('panels.json', 'utf8'));
 const panels = new Map(Object.values(panelsByChapter).flat().map((p) => [p.id, p]));
 
 const seconds = (file) =>
   Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).toString().trim());
+
+// Seconds of silence at the start of a take. Only the opening take is trimmed by this:
+// dead air before the first word is where a feed viewer swipes away.
+function leadingSilence(file) {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-i', file, '-af', 'silencedetect=noise=-35dB:d=0.08', '-f', 'null', '-'], { encoding: 'utf8' });
+  const start = /silence_start: (-?[\d.]+)/.exec(r.stderr ?? '');
+  const end = /silence_end: ([\d.]+)/.exec(r.stderr ?? '');
+  return start && end && Number(start[1]) <= 0.02 ? Number(end[1]) : 0;
+}
 
 const stripTags = (s) => s.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
 const clean = (w) => w.replace(/[^\p{L}\p{N}'!?.,…-]/gu, '');
@@ -73,7 +87,16 @@ const beats = [];
 for (const beat of script.beats) {
   const vo = `vo/${beat.id}.mp3`;
   const hasVo = existsSync(`public/${vo}`);
-  const voSec = hasVo ? seconds(`public/${vo}`) : null;
+  const timed = loadWords(beat.id);
+  // The opening take starts on its first word: skip its leading silence (keeping 40ms so
+  // the word's attack is not clipped), never past the first transcribed word.
+  let trimSec = 0;
+  if (hasVo && beats.length === 0) {
+    trimSec = Math.max(0, leadingSilence(`public/${vo}`) - 0.04);
+    if (timed?.length) trimSec = Math.min(trimSec, Math.max(0, timed[0].start));
+  }
+  const voTrim = Math.round(trimSec * FPS);
+  const voSec = hasVo ? seconds(`public/${vo}`) - voTrim / FPS : null;
   const durSec = beat.seconds ?? (voSec !== null ? voSec + 0.25 : 2.5);
   const durationInFrames = Math.round(durSec * FPS);
 
@@ -93,10 +116,13 @@ for (const beat of script.beats) {
   });
 
   const emphasis = new Set((beat.emphasis ?? []).map((w) => w.toLowerCase()));
-  const timed = loadWords(beat.id);
   let words;
   if (timed?.length) {
-    words = timed.map((w) => ({ text: clean(w.text), from: Math.round(w.start * FPS), to: Math.round(w.end * FPS) }));
+    words = timed.map((w) => ({
+      text: clean(w.text),
+      from: Math.max(0, Math.round(w.start * FPS) - voTrim),
+      to: Math.max(1, Math.round(w.end * FPS) - voTrim),
+    }));
   } else {
     const list = stripTags(beat.caption ?? beat.line ?? '').split(' ').filter(Boolean);
     const speak = voSec ?? durSec * 0.9;
@@ -113,6 +139,7 @@ for (const beat of script.beats) {
     effect: beat.effect ?? 'kenburns',
     hook: beat.hook ?? null,
     vo: hasVo ? vo : null,
+    voTrim,
     shots,
     words,
   });
@@ -134,4 +161,5 @@ const timeline = {
   durationInFrames: cursor + outroFrames,
 };
 await writeFile('src/timeline.json', JSON.stringify(timeline, null, 2));
+if (beats[0]?.voTrim) console.log(`opening take: skipped ${(beats[0].voTrim / FPS).toFixed(2)}s of leading silence`);
 console.log(`timeline: ${beats.length} beats, ${(timeline.durationInFrames / FPS).toFixed(1)}s total${timeline.music ? ', with music' : ''}`);

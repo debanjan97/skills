@@ -17,13 +17,14 @@ export const BeatView: React.FC<{ beat: Beat }> = ({ beat }) => {
         <Sequence key={shot.src + i} from={shot.from} durationInFrames={shot.durationInFrames}>
           <ShotView shot={shot} fx={fx} />
           {fx.has('speedlines') ? <SpeedLines seed={beat.id + i} /> : null}
-          {fx.has('punch') || fx.has('flash') ? <Flash /> : null}
+          {/* No flash on the very first shot: frame 0 is what the feed shows, and it must be the panel and the hook, not white. */}
+          {(fx.has('punch') || fx.has('flash')) && !(beat.from === 0 && i === 0) ? <Flash /> : null}
         </Sequence>
       ))}
       <Vignette />
       {beat.hook ? <Hook text={beat.hook} /> : null}
       <Captions words={beat.words} />
-      {beat.vo ? <Audio src={staticFile(beat.vo)} /> : null}
+      {beat.vo ? <Audio src={staticFile(beat.vo)} trimBefore={beat.voTrim || undefined} /> : null}
     </AbsoluteFill>
   );
 };

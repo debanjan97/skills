@@ -7,6 +7,7 @@ export type Beat = {
   effect: string;
   hook: string | null;
   vo: string | null;
+  voTrim: number; // frames skipped at the start of the take (leading silence on the opening beat)
   shots: Shot[];
   words: Word[];
 };
