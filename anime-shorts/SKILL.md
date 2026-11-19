@@ -40,6 +40,7 @@ From past shorts. Each item is also built into the template or a step below:
 - **No end card. Make it loop.** Nothing after the last line: no credit card, no thank-you, no "follow for more". Write the last beat so it leads back into the hook (the Naruto short ends on "…came home a hero", then cuts back to the village throwing him in the air). Render the last and first frames side by side and check the seam. `outroSeconds` exists only for a user who asks for an end card.
 - **The first two seconds decide the short.** YouTube's analytics on the Gojo short (2026-11-15, day one: 954 views, 49.55% stayed, 66% average view duration, 0 comments): half the feed swiped away before watching, while those who stayed watched two thirds. So the middle works and the open does not. The first beat therefore: shows the `hook` title and the most striking panel on frame 0 (no fade-in, no white flash), opens straight on the confrontation rather than the setup, says its point in 9 words or fewer, and moves at once (2–3 panels so the first cut lands inside the first second, or `punch`). The opening take's leading silence is trimmed by `build-timeline`. Open at narration or heightened, not a whisper (this last one is Claude's reading of the feedback, so it is a warning, not a rule).
 - **End on a question people want to answer.** The same short got no comments. The last line asks the viewer something debatable about the moment ("Did Sukuna beat Gojo, or did Mahoraga?"), not a generic "what do you think?". It is still a line of the story, not an end card, and it must still lead back into the hook for the loop. Give the user the same question as a suggested pinned comment. `check-delivery.mjs` enforces both this and the opening rules.
+- **Copy a reference by analysing the whole channel, not one video.** When the user points at a creator's Short, download 4–5 of that channel's best performers too (see "Reference style" in phase 0) and build the style from what they share. On the Levi short (2026-11-19) the user preferred the resulting **inknarrator** style ("this is better") over the default look: use `"style": "inknarrator"` unless they ask otherwise.
 - **Visuals get checked before the user sees them.** Render stills at the hook, every punch beat and every colour word, and Read them before rendering the full video.
 
 ## Workspace
@@ -77,6 +78,15 @@ Use pnpm (npm and npx are blocked by a hook). `pnpm-workspace.yaml` allows esbui
 
 Chapter URLs are asked for in phase 2, after research has named the chapters.
 
+### Reference style (when the user links a Short to copy)
+
+1. Download the Short with `yt-dlp` into its own scratch folder: video at ≤1920p, `--write-info-json`, and only `--sub-langs en-orig` (asking for `en` too gets HTTP 429). The `.vtt` gives the narration word for word.
+2. From the info JSON take the `channel_url`, then list the channel: `yt-dlp --flat-playlist --playlist-end 40 --print '%(id)s|%(title)s|%(view_count)s' '<channel_url>/shorts'` (the `@handle` can point at a different channel; use the URL). Download the 4–5 best by views the same way.
+3. Per video measure: duration, word count (words/s), cuts (`select='gt(scene,0.25)',showinfo`), gaps (`silencedetect=n=-45dB:d=0.3`; none means a music bed), a 4s-interval contact sheet, frame 0 and frames at 0.5/1.5/2.5s (the title card may last 1–2 frames only). Read them all.
+4. Write the shared pattern into `brief.md` (narration, visuals, where the skill's rules win) and map it to template options. TheInknarrator's pattern is already built in as `"style": "inknarrator"`.
+
+`ffmpeg` here has no `drawtext`; build contact sheets with `scale`/`pad`/`hstack`/`tile` only. Run multi-input ffmpeg loops under `bash -c` (zsh does not word-split `$ids`, and reads `$var:s…` as a modifier: write `${var}`).
+
 ## Phase 1: Research → `brief.md`
 
 1. WebSearch the topic, plus the series' fandom wiki chapter list. Find the series, author and official English publisher/platform (`readOn`), and the exact chapter numbers and pages where each moment happens.
@@ -91,6 +101,7 @@ Chapter URLs are asked for in phase 2, after research has named the chapters.
 1. Ask the user for the chapter URLs. If they give only the site, find the series page and the chapter links on it in the built-in browser pane, and show them which links you found.
 2. Open the first chapter in the built-in browser pane (`preview_start` with `url`) so the user can confirm the series and chapter number. If the reader shows one page at a time, ask the user to switch it to long-strip/vertical mode there.
 3. Find the selector for the reader's page images in the pane (e.g. `#imgs img`), so comment and ad images stay out. Test it on that first chapter alone.
+   No built-in pane (CLI session), or the user says "use playwright": `node scripts/find-chapters.mjs --series '<series url>' --chapters 79,80,81` opens the same visible Chrome profile, prints the chapter links and the image count per candidate selector on the first chapter. MangaKatana: `#imgs img`.
 4. Then capture **all remaining chapters in one run, in parallel tabs, in the background** (it waits for the user if a check appears):
    ```bash
    node scripts/capture.mjs --selector '#imgs img' --tabs 3 \
@@ -115,6 +126,8 @@ node scripts/cut-panels.mjs            # all chapters; or --chapters c1050,c1051
   node scripts/crop-panel.mjs --page pages/c1050/007.jpg --box 0,0.45,1,1
   ```
   Read the page image to judge the box, then Read the cropped panel to confirm.
+
+**inknarrator style: 9:16 crops instead of panels.** Full-bleed shots need regions with the frame's shape, and pages with thin gutters (Attack on Titan) mostly come out "whole page" anyway. List them in `crops.json` (`{ id, page: "c81/024", cx, y0, y1 }`, page fractions; width follows from the height at 9:16, centred on `cx`; `aspect: 1.125` for a hook-card half) and run `node scripts/crop-916.mjs`: it Lanczos-upscales to 1080 wide, sharpens lightly, and registers them in `panels.json` under `crops`. It prints each upscale factor: above ~3× looks soft on a phone, so give that crop more height. Choose regions by reading page strips (`scale=480:-2,pad=490:700:0:0:red`, 5 pages `hstack`ed), and avoid scanlation credit pages and watermarks.
 
 **Checkpoint 2 is folded into 3:** show the sheets together with the script.
 
@@ -144,6 +157,8 @@ node scripts/cut-panels.mjs            # all chapters; or --chapters c1050,c1051
 - `emphasis`: words shown big and red in the captions. One per beat at most.
 - Colour words are automatic: a spoken colour ("purple", "red", "black", "gold"…) is drawn in that colour, dark ones with a white outline. Add series-specific ones with `wordColors` (top level or per beat), a colour per word or a list per phrase, e.g. `"wordColors": { "black flash": ["#0a0a0a", "#e10600"], "cursed energy": "#5b2bff" }`.
 - `seconds`: fixed length, for a beat with no voiceover.
+- `style` (top level): `"default"` or `"inknarrator"`. inknarrator = full-bleed crops with slow push/drift, no backdrop/border/vignette; small mid-screen captions (Montserrat 800, 64px, normal case, spoken word yellow, colour words kept); 0.08s between takes instead of 0.25s. Narration in this style: plain present-tense recap at narration rung, opening "X is completely DOING Y." then "In chapter N of <series>, …", one lore one-liner as the commentary, and `[dramatically]` only on the 1–2 impact beats.
+- `hookCard` (top level, inknarrator): `{ "top": "<crop id>", "bottom": "<crop id>", "lines": ["LEVI IS DESTROYING", "THE BEAST TITAN!!"], "frames": 2 }`. Two panels stacked with a two-line title on the seam (white, then yellow, Luckiest Guy) for the first `frames` frames: the thumbnail. It replaces the beat-1 `hook` overlay; `check-delivery` accepts it in place of `hook` (8 words max). Make the top half the same panel the short ends on, so the loop is seamless.
 - `outroSeconds` (default 0, no end card), `creditLine` (default on; `false` hides it), `musicVolume` (default 0.12) go at the top level.
 
 Pacing: 45s ≈ 10–12 beats. Change the panel every 2–4s, and save `punch` for 2–3 real impact moments; using it on every beat removes its effect.
@@ -162,8 +177,12 @@ The ElevenLabs connector does voice and speech only (no music or sound effects).
 2. **Voice**: if `~/anime-shorts/narrator.json` has a `voice_id`, use it. Otherwise `creative_list_voices` (for example `search: "intense narrator"`, `use_cases: ["characters_animation", "narrative_story"]`, `descriptives: ["intense"]` or `["deep"]`), pick one, and save `{ "voice_id": ..., "name": ... }` to `narrator.json` so later shorts sound the same. `creative_design_voice` builds a custom voice, but it needs the user's own preview line and description.
 3. For each beat: `creative_generate_speech` with `model_id: "eleven_v4"`, the saved `voice_id`, `prompt: <line>` and **`generations_count: 1`**. Poll `creative_get_flow_run_status` until `all_completed`.
 4. Save each take to `public/vo/<beat id>.mp3`: download the audio URL from the run status with `curl -L`, and convert with `ffmpeg` if it is not mp3. If the status gives no downloadable URL, stop and ask the user to export the takes from the flow's canvas link into `public/vo/`. Don't guess URLs.
-5. Level the takes: `node scripts/normalize-vo.mjs` (−16 LUFS, originals kept in `public/vo/raw/`). Rerun it whenever a take is replaced. Without it, a calm line followed by an intense one jumps in volume as well as tone.
-6. Word timings: `creative_transcribe_audio` with `connect_from: [<speech node id>]` on the same flow. Write its `words` (or download `words_download_url`) to `words/<beat id>.json`. Timings are in seconds from the start of the take. If transcription is skipped, captions are spread evenly over each take, which is acceptable.
+   **If a generate call times out**, it may or may not have started: call `creative_get_flow` first. An empty flow means nothing ran and nothing was charged, so one retry is safe; after two empty timeouts stop and offer the user retry-later / export-from-the-web-app / captions-only. On 2026-11-18 the connector timed out on every speech call (estimates too) until the user reconnected it with `/mcp`.
+   Generate one take first; once it starts, fire the rest in parallel batches and log each beat's `node_id`/`session_id` to `vo-runs.tsv`. v4 costs ~1 credit per character (1,136 credits for 1,136 characters).
+5. **inknarrator pace:** v4 has no speed setting and reads ~2.5 words/s. `node scripts/tighten-vo.mjs --tempo 1.2 --pause 0.15 --keep b13=0.28` cuts pauses and time-stretches every take (originals in `public/vo/orig/`), giving ~3.1 words/s. Up to ~1.25 sounds natural.
+6. Level the takes: `node scripts/normalize-vo.mjs` (−16 LUFS, originals kept in `public/vo/raw/`). Rerun it whenever a take is replaced. Without it, a calm line followed by an intense one jumps in volume as well as tone.
+7. Word timings: `creative_transcribe_audio` with `connect_from: [<speech node id>]` on the same flow. Write its `words` (or download `words_download_url`) to `words/<beat id>.json`. Timings are in seconds from the start of the take. If transcription is skipped, captions are spread evenly over each take, which is acceptable.
+   **When the takes were tightened** (or edited at all), timings from the speech nodes no longer match. Instead: `node scripts/join-vo.mjs` → `creative_create_asset_upload` (audio/mpeg, the printed size) → `curl -X PUT -H 'Content-Type: audio/mpeg' --data-binary @words/all.mp3 '<upload_url>'` → `creative_finalize_asset_upload` with the `flow_id` → one `creative_transcribe_audio` on that node → download `words_download_url` to `words/all.words.json` → `node scripts/split-words.mjs --fix seventy-nine=79`. It prints words per beat against the script. Scribe costs ~5.5 credits per second of audio (417 for 76s): say so in the cost at checkpoint 3.
 
 Captions only: skip this phase and give every beat `seconds`.
 
@@ -192,6 +211,9 @@ Tweaks are cheap: edit `script.json`, then rerun `build-timeline` and render. `p
 - Every cut settles from a slight overshoot. `punch` slams in from 1.45×, shakes and flashes white.
 - Captions are Montserrat Black, uppercase, with a thick black stroke, 3 words at a time. The word being spoken turns yellow and `emphasis` words turn red. The hook is in Bangers, fully visible on frame 0.
 - A small credit line runs along the top edge for the whole Short. The bottom fifth is avoided because the platform's title and channel bar covers it. There is no end card.
+
+- The credit line sits on a dark pill, so it reads on white manga pages.
+- `"style": "inknarrator"` swaps in `ShotFull`, `CaptionsSmall` and `HookCard` (see phase 4).
 
 Change the style in `src/components/`. Keep the credit line.
 

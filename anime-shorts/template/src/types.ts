@@ -19,6 +19,10 @@ export type Timeline = {
   music: { src: string; volume: number } | null;
   beats: Beat[];
   outro: { from: number; durationInFrames: number; series: string; author: string; readOn: string };
+  // 'default' (blurred backdrop, framed panel, big captions) or 'inknarrator' (full-bleed panels,
+  // small mid-screen captions, split hook card on frame 0). Set by script.json "style".
+  style: string;
+  hookCard: { top: string; bottom: string; lines: string[]; frames: number } | null;
   creditLine: string | null;
   durationInFrames: number;
 };

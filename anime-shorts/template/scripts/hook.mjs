@@ -22,7 +22,11 @@ export function checkOpenAndClose(script) {
   const first = beats[0];
   if (!first) return { errors: ['script.json has no beats'], warnings };
 
-  if (!first.hook) errors.push(`${first.id}: the first beat needs a "hook" title; it is on screen from frame 0`);
+  if (script.hookCard) {
+    const n = wordCount((script.hookCard.lines ?? []).join(' '));
+    if (!script.hookCard.top || !script.hookCard.bottom) errors.push('hookCard needs a "top" and a "bottom" panel id');
+    if (n > MAX_HOOK_WORDS + 2) errors.push(`hookCard title is ${n} words; keep it to ${MAX_HOOK_WORDS + 2} or fewer`);
+  } else if (!first.hook) errors.push(`${first.id}: the first beat needs a "hook" title; it is on screen from frame 0`);
   else if (wordCount(first.hook) > MAX_HOOK_WORDS) errors.push(`${first.id}: hook is ${wordCount(first.hook)} words; keep it to ${MAX_HOOK_WORDS} or fewer`);
 
   const opening = spoken(first.line);

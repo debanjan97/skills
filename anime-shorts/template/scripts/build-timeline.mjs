@@ -15,6 +15,9 @@ import { checkOpenAndClose } from './hook.mjs';
 
 const FPS = 30;
 const script = JSON.parse(await readFile('script.json', 'utf8'));
+const STYLE = script.style ?? 'default';
+// Silence after each take. The inknarrator style runs the narration almost continuously.
+const BEAT_PAD = STYLE === 'inknarrator' ? 0.08 : 0.25;
 for (const p of checkTransitions(script.beats)) console.warn(`delivery: ${p}`);
 {
   const { errors, warnings } = checkOpenAndClose(script);
@@ -82,6 +85,10 @@ function colourWords(words, extra) {
   }
 }
 
+function fail(msg) {
+  throw new Error(msg);
+}
+
 let cursor = 0;
 const beats = [];
 for (const beat of script.beats) {
@@ -97,7 +104,7 @@ for (const beat of script.beats) {
   }
   const voTrim = Math.round(trimSec * FPS);
   const voSec = hasVo ? seconds(`public/${vo}`) - voTrim / FPS : null;
-  const durSec = beat.seconds ?? (voSec !== null ? voSec + 0.25 : 2.5);
+  const durSec = beat.seconds ?? (voSec !== null ? voSec + BEAT_PAD : 2.5);
   const durationInFrames = Math.round(durSec * FPS);
 
   const ids = beat.panels ?? [];
@@ -137,7 +144,8 @@ for (const beat of script.beats) {
     from: cursor,
     durationInFrames,
     effect: beat.effect ?? 'kenburns',
-    hook: beat.hook ?? null,
+    // With a hookCard (split title on frame 0) the title is drawn by the card, not over beat 1.
+    hook: script.hookCard ? null : beat.hook ?? null,
     vo: hasVo ? vo : null,
     voTrim,
     shots,
@@ -157,6 +165,15 @@ const timeline = {
   music: existsSync('public/music.mp3') ? { src: 'music.mp3', volume: script.musicVolume ?? 0.12 } : null,
   beats,
   outro: { from: cursor, durationInFrames: outroFrames, series: script.series, author: script.author, readOn: script.readOn },
+  style: STYLE,
+  hookCard: script.hookCard
+    ? {
+        frames: 2,
+        ...script.hookCard,
+        top: panels.get(script.hookCard.top)?.src ?? fail(`hookCard.top: unknown panel ${script.hookCard.top}`),
+        bottom: panels.get(script.hookCard.bottom)?.src ?? fail(`hookCard.bottom: unknown panel ${script.hookCard.bottom}`),
+      }
+    : null,
   creditLine: script.creditLine === false ? null : `${script.series} · ${script.author} · read it on ${script.readOn}`,
   durationInFrames: cursor + outroFrames,
 };

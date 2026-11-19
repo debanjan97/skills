@@ -12,8 +12,10 @@ export const CreditLine: React.FC<{ text: string }> = ({ text }) => (
         fontWeight: 900,
         fontSize: 30,
         letterSpacing: 1,
-        color: 'rgba(255,255,255,0.72)',
-        textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+        color: 'rgba(255,255,255,0.9)',
+        background: 'rgba(0,0,0,0.55)',
+        padding: '6px 18px',
+        borderRadius: 20,
       }}
     >
       {text}
